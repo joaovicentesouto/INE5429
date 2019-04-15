@@ -1,0 +1,920 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1.2in]{geometry}
+
+\title{%
+  Atividade 2 \\
+  Trabalho individual sobre Números Primos}
+\author{João Vicente Souto \\ 16105151}
+\date{14 abril 2019}
+
+\usepackage{natbib}
+\usepackage{graphicx}
+\usepackage{multirow}
+
+% Code
+\usepackage{listings}
+\usepackage{color}
+
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+\lstset{frame=tb,
+  language=Python,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numbers=none,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{dkgreen},
+  stringstyle=\color{mauve},
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=3
+}
+% End Code
+
+\begin{document}
+
+\maketitle
+
+\section{Introdução}
+
+Este trabalho apresenta a implementação de dois algoritmos para geração de números aleatórios e, utilizando o mais eficiente deles, é apresentado mais dois algoritmos para testar a primalidade dos números aleatórios gerados.
+
+Para facilitar o trabalho de implementação, principalmente na manipulação de números grande, foi utilizado a linguagem de programação \textit{Python}.
+Desta forma, o código gerado se torna mais intuitivo apesar da perda de desempenho em comparação com linguagens de mais baixo nível, \textit{C/C++} por exemplo.
+
+Primeiramente, a Seção \ref{sec:random} abordará a geração de números primos e a justificativa na escolha dos algoritmos, assim como, o detalhamento dos mesmo e a comparação entre as implementações.
+Em seguida, a Seção \ref{sec:prime} apresentará os teste de primalidade, apresentando os algoritmos, suas implementações e suas comparações.
+A Seção \ref{sec:conclusao} conclui o trabalho e, por fim, a Seção \ref{sec:codigo} apresenta os códigos fontes completos de cada script utilizado.
+
+\section{Geradores de números aleatórios}
+\label{sec:random}
+
+Como mencionado em aula, a geração de números aleatórios é de extrema importância em diversas áreas da computação, como segurança, simulação etc.
+Porém, gerar um número aleatório real é inviável em muitos casos, desta forma, recorre-se a algoritmos que geram sequências de números pseudo-aleatórios.
+Ou seja, gerar números que apresentem certas características que impossibilite um atacante descobrir a sequência na qual ele pertence.
+
+Neste contexto, foram escolhidos dois algoritmos amplamente utilizados e conhecidos para geração de números aleatórios descritos a seguir.
+Como base, foram utilizados o livro \cite{bib:livro} disponível no Moodle e artigos disponíveis na Wikipedia.
+
+\subsection{\textit{Linear congruential generator (LCG)}}
+\label{lcg-parcial}
+
+O gerador congruencial linear foi escolhido porque é um dos mais antigos e mais conhecidos algoritmos que produz sequências de números pseudo-aleatórios calculados com uma função linear \cite{bib:lcg1}.
+
+O gerador é definido pela relação de recorrência:
+
+{
+\centering{$X_{n+1} = (a * X_n + c) mod m$ onde:}
+    \begin{itemize}
+	    \item $X$ é a sequência de valores pseudo-aleatórios
+	    \item $m$ é o módulo, sendo $0 < m$
+	    \item $a$ é o multiplicador, sendo $0 < a < m$
+	    \item $c$ é o incremento, sendo $0 <= c < m$
+	    \item $X_0$ é os valor inicial, sendo $0 <= X_0 < m$ 
+    \end{itemize}
+}
+    
+Outro fator que levaram a sua escolha foi a possibilidade de utilizar um valor arbitrário no módulo $m$, desta forma, um número poderá ser calculado dentro de um intervalo de $0$ à $2^{4096}$, por exemplo.
+
+O código a seguir demonstra a criação de uma classe que inicializa os parâmetros mencionados acima. Onde a função \textit{next()} implementa a relação de recorrência.
+
+\begin{lstlisting}
+# Algoritmo LCG:
+# LinearCongruentialGenerators.py (Parcial)
+
+class LinearCongruentialGenerator:
+	def __init__(self, m, a, c, x0):
+		"""
+		Configure the initial state of the RNG.
+
+		Parameters:
+		m  -- The modulus    : m > 0
+		a  -- The multiplier : 0 < a < m 
+		c  -- The increment  : 0 <= c < m
+		x0 -- The seed       : 0 <= x0 < m
+		"""
+		assert(m > 0)
+		assert(0 < a and a < m)
+		assert(0 <= c and c < m)
+		assert(0 <= x0 and x0 < m)
+
+		self.m  = m
+		self.a  = a
+		self.c  = c
+		self.xi = x0
+
+	def next(self):
+		"""
+		Generates the next random number.
+
+		Returns:
+		The next random number
+		"""
+		# Generates the next random number with the
+		# formula: X(i+1) = (a * X(i) + c) mod m
+		self.xi = (self.a * self.xi + self.c) % self.m
+		return self.xi
+\end{lstlisting}
+
+% \pagebreak
+A saída, Figura \ref{fig:lcg-partial}, demonstra a execução do LCG utilizando os seguintes valores\cite{bib:lcg2}:
+\begin{itemize}
+	    \item $a = 1103515245$
+	    \item $c = 12345$
+	    \item $m = 2^{[40, 56, 80, 128, 168, 224, 256, 512, 1024, 2048, 4096]}$
+	    \item $X_0 = tempo atual do sistema em milisegundos$
+\end{itemize}
+
+\begin{figure}[h!]
+	\centering
+	\includegraphics[scale=0.35]{figs/lcg-py.png}
+	\caption{Saída do terminal rodando o script LinearCongruentialGenerators.py}
+	\label{fig:lcg-partial}
+\end{figure}
+
+\subsection{\textit{Blum Blum Shub} (BBS)}
+
+O \textit{Blum Blum Shub} é um algoritmo para geração de números pseudo-aleatórios proposto por Lenore Blum, Manuel Blum e Michael Shub em 1986 \cite{bib:bbs1}.
+A motivo para sua escolha se assemelha ao algoritmo anterior, sendo ele muito conhecido e utilizado. Além disso, sua implementação é simples e permite lidar facilmente com números grandes\cite{bib:livro}.
+
+O algoritmo BBS é:
+
+{
+\centering{$X_{n+1} = (X_n)^2 mod n$ onde:}
+    \begin{itemize}
+	    \item $n = p * q$, sendo:
+	    \begin{itemize}
+	        \item $p$ é primo e congruente a $3 (mod 4)$
+	        \item $q$ é primo e congruente a $3 (mod 4)$
+	        \item $p mod 4 = q mod 4 = 3$
+	    \end{itemize}
+	    \item $X$ é a sequência de valores pseudo-aleatórios
+    \end{itemize}
+}
+
+Ao utilizar este algoritmo, é possível extrair uma sequência aleatória de bits, onde a probabilidade do próximo bit da sequência ser $0$ ou $1$ é igual a $1/2$, tornando o algoritmo mais robusto.
+
+O código a seguir demonstra a criação de uma classe que inicializa os parâmetros mencionados acima. Onde a função \textit{next()} implementa o algoritmo BBS.
+
+\pagebreak
+\begin{lstlisting}
+# Algoritmo BBS:
+# BlumBlumShub.py (Parcial)
+
+class BlumBlumShub:
+	def __init__(self, n, seed, bits_amount):
+		"""
+		Configure the initial state of the RNG.
+
+		Parameters:
+		n            -- n = p * q where (p mod 4) = (q mod 4) = 3
+		seed         -- Initial value
+		bits_amount  -- Size of the bitstream for generate a number
+		"""
+		self.n = n
+		self.bits_amount = bits_amount
+		self.xi = pow(seed, 2, n)
+
+	def next(self):
+		"""
+		Generates the next random number.
+		"""
+		# Bitstream
+		bitstream = ""
+
+		# Generates a stream with size equal bits amount
+		for bits in range(0, self.bits_amount):
+
+			# Calculates: X(i+1) = X(i)^2 % n
+			self.xi = pow(self.xi, 2, self.n)
+
+			# Gets the least bit significant
+			bit_i = self.xi % 2
+
+			# Concatenates the new bit on bitstream
+			bitstream = bitstream + str(bit_i)
+		
+		# Converts bitstream into integer with bits amount of length
+		return int(bitstream, 2)
+\end{lstlisting}
+
+A saída, Figura \ref{fig:blum-partial}, demonstra a execução do BBS utilizando os seguintes valores mencionados no livro fonte\cite{bib:bbs1}:
+\begin{itemize}
+	    \item $n = 192649$
+	    \item $seed = 101355$
+	    \item $bits\_amount = [40, 56, 80, 128, 168, 224, 256, 512, 1024, 2048, 4096]$
+\end{itemize}
+
+\pagebreak
+
+\begin{figure}[h!]
+	\centering
+	\includegraphics[scale=0.35]{figs/blum-py.png}
+	\caption{Saída do terminal rodando o script BlumBlumShub.py}
+	\label{fig:blum-partial}
+\end{figure}
+
+\subsection{Comparação}
+
+Ambos os algoritmos são similares em seus algoritmos, principalmente pela sua simplicidade, não necessitando de muito processamento de corrente das suas complexidade,  \texit{O(1)}.
+Porém, o algoritmo LCG possui menor segurança por possibilitar que um atacante descubra quais são seus parâmetros através da análise de frequência dos números gerados.
+Sabendo alguns parâmetros, é possível calcula-los a partir da resolução de um sistema linear.
+Como alternativa é possível, a partir de um número de números gerados, alterar aleatoriamente os parâmetros do algoritmo, aumentando sua segurança.
+
+Por outro lado, o algoritmo BBS gera uma sequência de bits aleatória entre si, ou seja, não é possível dizer qual será o valor do próximo bit gerado.
+Ou seja, a probabilidade descobrir o próximo valor é de $1/2$, sendo que existem apenas dois valores possíveis.
+
+Como pode ser analisado na Tabela \ref{tab:random}, o algoritmo LCG apresentou um desempenho significativo em comparação com o algoritmo BBS.
+Isto se deve a implementação em \textit{Python} do BBS, onde para gerar um número, primeiramente é construído uma \textit{string} do comprimento desejado.
+Desta forma, o maior tempo de desempenho é dado pela geração de n números aleatórios para conseguir calcular os n bits solicitados.
+
+\pagebreak
+
+\begin{table}[]
+\centering
+\begin{tabular}{|L|L|L|} \hline
+Quantidade de bits    & Algoritmo & Tempo (\mu~segundos) \\ \hline \hline
+\multirow{2}{*}{40}   & LCG       & 0.00444              \\ \cline{2-3}
+					  & BBS       & 0.10157              \\ \hline
+\multirow{2}{*}{56}   & LCG       & 0.00715              \\ \cline{2-3}
+					  & BBS       & 0.12803              \\ \hline
+\multirow{2}{*}{80}   & LCG       & 0.00558              \\ \cline{2-3}
+					  & BBS       & 0.13351              \\ \hline
+\multirow{2}{*}{128}  & LCG       & 0.00578              \\ \cline{2-3}
+					  & BBS       & 0.23699              \\ \hline
+\multirow{2}{*}{168}  & LCG       & 0.00539              \\ \cline{2-3}
+					  & BBS       & 0.29516              \\ \hline
+\multirow{2}{*}{224}  & LCG       & 0.00531              \\ \cline{2-3}
+					  & BBS       & 0.37766              \\ \hline
+\multirow{2}{*}{256}  & LCG       & 0.00546              \\ \cline{2-3}
+					  & BBS       & 0.39947              \\ \hline
+\multirow{2}{*}{512}  & LCG       & 0.00374              \\ \cline{2-3}
+					  & BBS       & 0.80109              \\ \hline
+\multirow{2}{*}{1024} & LCG       & 0.00682              \\ \cline{2-3}
+					  & BBS       & 1.65081              \\ \hline
+\multirow{2}{*}{2048} & LCG       & 0.00625              \\ \cline{2-3}
+					  & BBS       & 3.91674              \\ \hline
+\multirow{2}{*}{4096} & LCG       & 0.01071              \\ \cline{2-3}
+					  & BBS       & 7.14870              \\ \hline
+\end{tabular}
+
+\caption{Comparação de tempos dos algoritmos de geração de números aleatórios}
+\label{tab:random}
+\end{table}
+
+\section{Teste de Primalidade}
+\label{sec:prime}
+
+Isso é uma introdução
+
+\subsection{Miller Rabin}
+
+Isso é uma introdução
+
+\begin{lstlisting}
+# Algoritmo Miller Rabin:
+# MillerRabin.py
+
+def MillerRabin(n, k, rng):
+	# Ignore some cases
+	if n < 4 or n % 2 == 0:
+		return "conclusive"
+
+	# Write n as (2^r * d) + 1 with d odd (by factoring out powers of 2 from n - 1)
+	d = n-1
+	r = 0
+	while d % 2 == 0:
+		d = d >> 1
+		r += 1
+
+	# Repeat k times:
+	for _ in range(k):
+		
+		# Pick a random integer a in the range [2, n - 2]
+		a = (generate(rng) % n - 3) + 2
+
+		# a^d % m
+		x = pow(a, d, n)
+
+		# With that a is inconclusive
+		if x == 1 or x == n-1:
+			continue
+
+		conclusive = True
+		for _ in range(r - 1):
+
+			# x(i+1) = x(i)^2 % n
+			x = pow(x, 2, n)
+
+			# inconclusive
+			if x == n - 1:
+				conclusive = False
+				continue
+		
+		# If this a is inconclusive then repeat the process
+		if conclusive:
+			return "conclusive"
+	
+	return "probably prime"
+\end{lstlisting}
+
+\begin{figure}[h!]
+	\centering
+	\includegraphics[scale=0.35]{figs/miller-rabin.png}
+	\caption{Saída do terminal rodando o script MillerRabin.py}
+	\label{fig:universe}
+\end{figure}
+
+\subsection{Fermat}
+
+Isso é uma introdução
+
+\begin{lstlisting}
+# Algoritmo Fermat:
+# Fermat.py
+
+def Fermat(n, k, rng):
+	# Ignore some cases
+	if n < 2 or n % 2 == 0:
+		return "conclusive"
+
+	# Repeat k times
+	for _ in range(k):
+
+		# Generates a into [2, n - 2]
+		a = (generate(rng) % n - 3) + 2
+
+		# Calculate a^(n - 1) % n and if is different of 1 then n is not prime
+		if pow(a, n - 1, n) != 1:
+			return "conclusive"
+
+	return "probably prime"
+\end{lstlisting}
+
+\begin{figure}[h!]
+	\centering
+	\includegraphics[scale=0.35]{figs/fermat.png}
+	\caption{Saída do terminal rodando o script Fermat.py}
+	\label{fig:universe}
+\end{figure}
+
+\subsection{Comparação}
+
+Isso é uma introdução
+
+\begin{table}[]
+\centering
+\begin{tabular}{|L|L|L|L|} \hline
+Quantidade de bits    & Algoritmo    & Tempo (\mu~segundos) & Tentativas \\ \hline \hline
+\multirow{2}{*}{40}   & Miller Rabin & 5.89514              & 25         \\ \cline{2-4}
+					  & Fermat       & 6.08468              & 45         \\ \hline
+\multirow{2}{*}{56}   & Miller Rabin & 2.13313              & 18         \\ \cline{2-4}
+					  & Fermat       & 1.94001              & 2          \\ \hline
+\multirow{2}{*}{80}   & Miller Rabin & 5.20706              & 25         \\ \cline{2-4}
+					  & Fermat       & 7.13492              & 47         \\ \hline
+\multirow{2}{*}{128}  & Miller Rabin & 10.43010             & 60         \\ \cline{2-4}
+					  & Fermat       & 13.48829             & 36         \\ \hline
+\multirow{2}{*}{168}  & Miller Rabin & 19.68312             & 33         \\ \cline{2-4}
+					  & Fermat       & 18.60309             & 91         \\ \hline
+\multirow{2}{*}{224}  & Miller Rabin & 30.15494             & 48         \\ \cline{2-4}
+					  & Fermat       & 29.83402             & 74         \\ \hline
+\multirow{2}{*}{256}  & Miller Rabin & 38.53512             & 105        \\ \cline{2-4}
+					  & Fermat       & 32.87292             & 79         \\ \hline
+\multirow{2}{*}{512}  & Miller Rabin & 600.76118            & 1066       \\ \cline{2-4}
+					  & Fermat       & 673.37084            & 1219       \\ \hline
+\multirow{2}{*}{1024} & Miller Rabin & 2336.81107           & 634        \\ \cline{2-4}
+					  & Fermat       & 1455.97386           & 324        \\ \hline
+\multirow{2}{*}{2048} & Miller Rabin & 3351.92204           & 5          \\ \cline{2-4}
+					  & Fermat       & 44112.44226          & 1877       \\ \hline
+\multirow{2}{*}{4096} & Miller Rabin & 95790.78412          & 584        \\ \cline{2-4}
+					  & Fermat       & 455806.92720         & 3871       \\ \hline
+\end{tabular}
+
+\caption{Comparação de tempos dos algoritmos de teste de primalidade}
+\label{tab:prime}
+
+\end{table}
+
+\section{Conclusão}
+\label{sec:conclusao}
+
+Ab e c
+
+\pagebreak
+
+\section{Códigos Fonte}
+\label{sec:codigo}
+
+\subsection{Código e teste do Linear Congruential Generator}
+\label{lcg-full}
+
+\begin{lstlisting}
+# LinearCongruentialGenerators.py
+import math, time
+
+# ================ Implementation ================
+
+import math, time
+
+class LinearCongruentialGenerator:
+	def __init__(self, m, a, c, x0):
+		"""
+		Configure the initial state of the RNG.
+
+		Parameters:
+		m  -- The modulus    : m > 0
+		a  -- The multiplier : 0 < a < m 
+		c  -- The increment  : 0 <= c < m
+		x0 -- The seed       : 0 <= x0 < m
+		"""
+		assert(m > 0)
+		assert(0 < a and a < m)
+		assert(0 <= c and c < m)
+		assert(0 <= x0 and x0 < m)
+
+		self.m  = m
+		self.a  = a
+		self.c  = c
+		self.xi = x0
+
+	def next(self):
+		"""
+		Generates the next random number.
+
+		Returns:
+		The next random number
+		"""
+		# Generates the next random number with the
+		# formula: X(i+1) = (a * X(i) + c) mod m
+		self.xi = (self.a * self.xi + self.c) % self.m
+		return self.xi
+
+# ================ Auxiliar functions ================
+
+def correct_bits_length(bits_expected, number):
+	"""
+	Checks if the number has sufficient bits
+
+	Keyword arguments:
+	bits_expected -- Number of bits expected. 
+	number        -- Decimal number
+
+	Returns:
+	True if equal False otherwise
+	"""
+	length_expected = int(math.log10(2 ** bits_expected))
+	actual_length = int(math.log10(number))
+	return length_expected == actual_length
+
+def generate(bits, a, c, x0):
+	"""
+	Builds the RNG and measure the time of generate a random number.
+
+	Parameters:
+    bits -- Number of bits expected
+	a    -- The multiplier
+	c    -- The increment
+	x0   -- The seed
+
+    Returns:
+    A random number
+	"""
+	# Calculates the module m of the algorithm
+	m = 2 ** bits
+
+	# Init RNG with its arguments
+	lcg = LinearCongruentialGenerator(m, a, c, x0)
+
+	# Start measuring time
+	start = time.time()
+
+	# Genereates a random number
+	number = lcg.next()
+	generations = 1
+
+	# While the number does not have sufficient bits
+	while not correct_bits_length(bits, number):
+		# Genereates a new random number
+		number = lcg.next()
+		generations += 1
+
+	# Stop measuring time
+	end = time.time()
+
+	mean = (end - start) / generations * 1000.0
+
+	# Print the results
+	print("Generates a number with %d bits taking %.5f ms:" % (bits, mean))
+	print("%d\n" % number)
+
+# ================ Tests ================
+
+if __name__ == '__main__':
+	"""
+	Main function to execute all random number generations
+	"""
+
+	# Default arguments
+	a  = 1103515245
+	c  = 12345
+	x0 = int(time.time())
+	bits_array = [40, 56, 80, 128, 168, 224, 256, 512, 1024, 2048, 4096]
+
+	print("Linear Congruential Generator Parameters:")
+	print("a : %d | c: %d | x0: %d | bits: %s\n" % (a, c, x0, str(bits_array)))
+
+	# Execute random number generation
+	for bits in bits_array:
+		generate(bits, a, c, x0)
+\end{lstlisting}
+
+\pagebreak
+
+\subsection{Código e teste do Blum Blum Shub}
+\label{bbs-full}
+
+\begin{lstlisting}
+# BlumBlumShub.py
+import math, time
+
+# ================ Implementation ================
+
+class BlumBlumShub:
+	def __init__(self, n, seed, bits_amount):
+		"""
+		Configure the initial state of the RNG.
+
+		Parameters:
+		n            -- n = p * q where (p mod 4) = (q mod 4) = 3
+		seed         -- Initial value
+		bits_amount  -- Size of the bitstream for generate a number
+		"""
+		self.n = n
+		self.bits_amount = bits_amount
+		self.xi = pow(seed, 2, n)
+
+	def next(self):
+		"""
+		Generates the next random number.
+		"""
+		# Bitstream
+		bitstream = ""
+
+		# Generates a stream with size equal bits amount
+		for bits in range(0, self.bits_amount):
+
+			# Calculates: X(i+1) = X(i)^2 % n
+			self.xi = pow(self.xi, 2, self.n)
+
+			# Gets the least bit significant
+			bit_i = self.xi % 2
+
+			# Concatenates the new bit on bitstream
+			bitstream = bitstream + str(bit_i)
+		
+		# Converts bitstream into integer with bits amount of length
+		return int(bitstream, 2)
+
+# ================ Auxiliar functions ================
+
+def correct_bits_length(bits_expected, number):
+	"""
+	Checks if the number has sufficient bits
+
+	Keyword arguments:
+	bits_expected -- Number of bits expected. 
+	number        -- Decimal number
+
+	Returns:
+	True if equal False otherwise
+	"""
+	length_expected = int(math.log10(2 ** bits_expected))
+	actual_length = int(math.log10(number))
+	return length_expected == actual_length
+
+def generate(n, seed, bits):
+	"""
+	Builds the RNG and measure the time of generate a random number.
+
+	Parameters:
+	n            -- n = p * q where (p mod 4) = (q mod 4) = 3
+	seed         -- Initial value
+	bits_amount  -- Size of the bitstream for generate a number
+	"""
+	# Init RNG with its arguments
+	bbs = BlumBlumShub(n, seed, bits)
+
+	# Start measuring time
+	start = time.time()
+
+	# Genereates a random number
+	number = bbs.next()
+	generations = 1
+
+	# While the number does not have sufficient bits
+	while not correct_bits_length(bits, number):
+		# Genereates a new random number
+		number = bbs.next()
+		generations += 1
+	
+	# Stop measuring time
+	end = time.time()
+
+	mean = (end - start) / generations * 1000.0
+
+	# Print the results
+	print("Generates a number with %d bits taking %.5f ms:" % (bits, mean))
+	print("%d\n" % number)
+
+# ================ Tests ================
+
+if __name__ == '__main__':
+	"""
+	Main function to execute all random number generations
+    """
+
+	# Default arguments
+	n    = 192649
+	seed = 101355
+	bits_array = [40, 56, 80, 128, 168, 224, 256, 512, 1024, 2048, 4096]
+
+	print("BlumBlumShub Parameters: n=%d, seed=%d, bits=%s\n" % (n, seed, str(bits_array)))
+
+	# Execute random number generation
+	for bits in bits_array:
+		generate(n, seed, bits)
+\end{lstlisting}
+
+\pagebreak
+
+\subsection{Código e teste do Miller Rabin}
+\label{miller-rabin-full}
+
+\begin{lstlisting}
+# MillerRabin.py
+
+import math, time
+from LinearCongruentialGenerators import LinearCongruentialGenerators
+
+# ================ Implementation ================
+
+def MillerRabin(n, k, rng):
+	# Ignore some cases
+	if n < 4 or n % 2 == 0:
+		return "conclusive"
+
+	# Write n as (2^r * d) + 1 with d odd (by factoring out powers of 2 from n - 1)
+	d = n-1
+	r = 0
+	while d % 2 == 0:
+		d = d >> 1
+		r += 1
+
+	# Repeat k times:
+	for _ in range(k):
+		
+		# Pick a random integer a in the range [2, n - 2]
+		a = (generate(rng) % n - 3) + 2
+
+		# a^d % m
+		x = pow(a, d, n)
+
+		# With that a, is inconclusive
+		if x == 1 or x == n-1:
+			continue
+
+		conclusive = True
+		for _ in range(r - 1):
+
+			# x(i+1) = x(i)^2 % n
+			x = pow(x, 2, n)
+
+			# inconclusive
+			if x == n - 1:
+				conclusive = False
+				continue
+		
+		# If this a is inconclusive then repeat the process
+		if conclusive:
+			return "conclusive"
+	
+	return "probably prime"
+
+# ================ Auxiliar functions ================
+
+def correct_bits_length(bits_expected, number):
+	"""
+	Checks if the number has sufficient bits
+
+	Keyword arguments:
+	bits_expected -- Number of bits expected. 
+	number        -- Decimal number
+
+	Returns:
+	True if equal False otherwise
+	"""
+	length_expected = int(math.log10(2 ** bits_expected))
+	actual_length = int(math.log10(number))
+	return length_expected == actual_length
+
+def generate(rng):
+	"""
+	Builds the RNG and measure the time of generate a random number.
+
+	Parameters:
+	rng -- RNG
+
+    Returns:
+    A random number
+	"""
+	# Genereates a random number
+	number = rng.next()
+
+	# While the number does not have sufficient bits
+	while not correct_bits_length(bits, number):
+		# Genereates a new random number
+		number = rng.next()
+	
+	return number
+
+# ================ Tests ================
+
+if __name__ == '__main__':
+
+	iterations = 100
+	bits_array = [40, 56, 80, 128, 168, 224, 256, 512, 1024, 2048, 4096]
+
+	print("MillerRabin with Linear Congruential Generators (%d iterations)\n" % iterations)
+
+	# For any amount of bits
+	for bits in bits_array:
+		number = 0
+		attempts = 0
+		is_prime = False
+
+		# Use LCG as RNG
+		rng = LinearCongruentialGenerators(2 ** bits, 25214903917, 11, int(time.time()))
+
+		# Start measuring time
+		start = time.time()
+
+		# While the number is not prime
+		while not is_prime:
+
+			# Attempts counter
+			attempts+= 1
+			is_prime = True
+
+			# Generates a random number
+			number = generate(rng)
+
+			# Checks if is probably a prime number
+			is_prime = MillerRabin(number, iterations, rng) == "probably prime"
+
+		# Stop measuring time
+		end = time.time()
+
+		final_time = (end - start) * 1000.0
+
+		print("Bits %d: took %d attempts and took %.5f ms to find the follow prime number:" % (bits, attempts, final_time))
+		print("%d\n" % number)
+\end{lstlisting}
+
+\pagebreak
+
+\subsection{Código e teste do Fermat}
+\label{fermat-full}
+
+\begin{lstlisting}
+# Fermat.py
+
+import math, time
+from LinearCongruentialGenerators import LinearCongruentialGenerators
+
+# ================ Implementation ================
+
+def Fermat(n, k, rng):
+	# Ignore some cases
+	if n < 2 or n % 2 == 0:
+		return "conclusive"
+
+	# Repeat k times
+	for _ in range(k):
+
+		# Generates a into [2, n-2]
+		a = (generate(rng) % n - 3) + 2
+
+		# Calculate a^(n-1) % n and if is different of 1 then n is not prime
+		if pow(a, n - 1, n) != 1:
+			return "conclusive"
+
+	return "probably prime"
+
+# ================ Auxiliar functions ================
+
+def correct_bits_length(bits_expected, number):
+	"""
+	Checks if the number has sufficient bits
+
+	Keyword arguments:
+	bits_expected -- Number of bits expected. 
+	number        -- Decimal number
+
+	Returns:
+	True if equal False otherwise
+	"""
+	length_expected = int(math.log10(2 ** bits_expected))
+	actual_length = int(math.log10(number))
+	return length_expected == actual_length
+
+def generate(rng):
+	"""
+	Builds the RNG and measure the time of generate a random number.
+
+	Parameters:
+    rng -- RNG
+
+    Returns:
+    A random number
+	"""
+	# Genereates a random number
+	number = rng.next()
+
+	# While the number does not have sufficient bits
+	while not correct_bits_length(bits, number):
+		# Genereates a new random number
+		number = rng.next()
+
+	return number
+
+# ================ Tests ================
+
+if __name__ == '__main__':
+
+	iterations = 100
+	bits_array = [40, 56, 80, 128, 168, 224, 256, 512, 1024, 2048, 4096]
+
+	print("Fermat with Linear Congruential Generators (%d iterations)\n" % iterations)
+
+	for bits in bits_array:
+		number = 0
+		attempts = 0
+		is_prime = False
+		rng = LinearCongruentialGenerators(2 ** bits, 25214903917, 11, int(time.time()))
+
+		start = time.time()
+
+		while not is_prime:
+
+			attempts+= 1
+			is_prime = True
+			number = generate(rng)
+
+			is_prime = Fermat(number, iterations, rng) == "probably prime"
+
+		end = time.time()
+
+		final_time = (end - start) * 1000.0
+
+		print("Bits %d: took %d attempts and took %.5f ms to find the follow prime number:" % (bits, attempts, final_time))
+		print("%d\n" % number)
+\end{lstlisting}
+
+\pagebreak
+
+\begin{thebibliography}{5}
+
+\bibitem{bib:lcg1}
+Definição e algoritmo: Linear congruential generator
+\\\texttt{https://en.wikipedia.org/wiki/Linear\_congruential\_generator}
+
+\bibitem{bib:lcg2}
+Parâmetros e algoritmo: Linear congruential generator
+\\\texttt{https://rstudio-pubs-static.s3.amazonaws.com/300131\_e504d6ca49714187990520fb22e86607.html}
+
+\bibitem{bib:bbs1} 
+Definição e algoritmo: Blum Blum Shub
+\\\texttt{https://en.wikipedia.org/wiki/Blum\_Blum\_Shub}
+
+\bibitem{bib:miller-rabin}
+Algoritmo: Miller Rabin
+\\\texttt{https://rosettacode.org/wiki/Miller\%E2\%80\%93Rabin\_primality\_test\#Python}
+
+\bibitem{bib:fermat}
+Definição e algoritmo: Fermat
+\\\texttt{https://en.wikipedia.org/wiki/Fermat\_primality\_test}
+
+\bibitem{bib:livro}
+Definição e algoritmo: LCG, BBS, Miller Rabin e Fermat: Livro fonte no Moodle
+\\\texttt{Stallings, William - Cryptography and Network Security: Principles and Practice, Sixth Edition}
+
+\end{thebibliography}
+
+\end{document}
